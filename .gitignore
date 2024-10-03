@@ -1,0 +1,41 @@
+# Global ignores
+# Ignore node_modules and environment variables in both client and server
+node_modules/
+.env
+*.log
+
+# Ignore build/output directories
+/build
+/dist
+
+# Ignore dependency directories inside client and server
+/client/node_modules
+/server/node_modules
+
+# Ignore build files from React (client)
+client/build
+client/.next # If you're using Next.js
+
+# Ignore client environment variables
+client/.env
+
+# Ignore TypeScript cache
+client/*.tsbuildinfo
+
+# Ignore lock files
+yarn.lock
+package-lock.json
+
+# Ignore IDE specific folders
+.vscode/
+.idea/
+.DS_Store
+
+# Logs from client and server
+client/*.log
+server/*.log
+
+# Ignore backend build files or dist folder (Node.js server)
+server/dist
+server/.env
+server/*.tsbuildinfo
