@@ -1,6 +1,9 @@
 import { Server } from "socket.io";
 
+
 const PORT = 8000;
+
+
 
 const io  = new Server(PORT,{
     cors : {
@@ -14,18 +17,31 @@ io.on("connection",(socket)=>{
 
      // join call room
     socket.on("join:room",(room)=>{
+        console.log("enter ");
+        
+        console.log("join room here : ",room);
         socket.join(room);
         socket.broadcast.to(room).emit("join:room", { from: socket.id });
     });
 
     // if already any client exist in this room
     socket.on("alreadyExist",({to})=>{
-        io.to(to).emit("alreadyExist", { from: socket.id });
+        io.to(to).emit("alreadyExist", { from:socket.id });
     }); 
 
     //client send offer
     socket.on("offer", ({ to, offer }) => {
-         io.to(to).emit("offer", { from: socket.id, offer });
+        console.log("in offer socket ", socket.id);
+         io.to(to).emit("offer", { from:socket.id, offer });
+    });
+
+    socket.on("negoOffer", ({ room, offer }) => {
+         
+         socket.broadcast.to(room).emit("negoOffer", {from:socket.id,  offer });
+    });
+    socket.on("handleNegoAnswer", ({ to, answer }) => {
+         
+        io.to(to).emit("handleNegoAnswer", { answer });
     });
 
     // handle answer
@@ -40,3 +56,4 @@ io.on("connection",(socket)=>{
 
 
 })
+

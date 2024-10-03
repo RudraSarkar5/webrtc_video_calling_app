@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useEffect, useMemo, ReactNode } from "react"; 
-import { io, Socket } from "socket.io-client"; 
+import React, { createContext, useContext, useEffect, useMemo,  } from "react"; 
+import { io } from "socket.io-client"; 
+import { 
+    SocketContextType ,
+    SocketProviderProps,
+} from "../Type/type"
 
 
-export type SocketContextType = Socket | null;
 
 
 const SocketContext = createContext<SocketContextType>(null);
@@ -12,19 +15,21 @@ export const useSocket = (): SocketContextType => {
   return useContext(SocketContext); 
 };
 
-
-interface SocketProviderProps {
-  children: ReactNode;
-}
-
-
 const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const socket = useMemo(() => io("http://localhost:8000"), []);
 
   
   useEffect(() => {
+    
+    socket.on("connect",()=>{
+      console.log("socked connected : ",socket.id);
+      
+    })
+    
     return () => {
+      console.log("now what happen");
+      
       socket.disconnect(); 
     };
   }, [socket]);

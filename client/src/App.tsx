@@ -1,5 +1,6 @@
 import { createBrowserRouter , RouterProvider  } from "react-router-dom"
 import { Lobby, Room } from "./pages"
+import SocketProvider from "./context/SocketProvider"
 
 function App() {
   
@@ -18,7 +19,10 @@ function App() {
 
   return (
 
-    < RouterProvider router= {router}/>
+    <SocketProvider>
+      < RouterProvider router= {router}/>
+    </SocketProvider>
+
   )
 }
 

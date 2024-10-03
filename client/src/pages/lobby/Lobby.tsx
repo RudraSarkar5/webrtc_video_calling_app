@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { SocketContextType, useSocket } from "../../context/SocketProvider"; // Adjust the import path as necessary
+import {  useSocket } from "../../context/SocketProvider"; 
 import { useNavigate } from "react-router-dom";
+import { SocketContextType } from "../../Type/type";
 
 
 const Lobby: React.FC = () => {
@@ -12,17 +13,13 @@ const Lobby: React.FC = () => {
   const navigate = useNavigate();
 
   const handleJoin = () => {
-    if ( room.length < 1){
-      alert("please set room Id")
-      return;
-    }
-    if (socket) { 
-      socket.emit("join:room", room); 
-      navigate(`/call/${room}`); 
-    } else {
-      console.error("Socket is not connected."); 
-      
-    }
+      if ( room.length < 1){
+        alert("please set room Id")
+        return;
+      }
+      console.log("room is : ",room); 
+      socket?.emit("join:room",room);
+      navigate(`/room/${room}`); 
   };
 
   return (
@@ -34,6 +31,7 @@ const Lobby: React.FC = () => {
               value={room}
               onChange={(e) => setRoom(e.target.value)} 
               type="text"
+              className="text-black p-2"
               placeholder="Room ID"
             />
             <button className="bg-blue-500 px-5 py-2 rounded-xl" onClick={handleJoin}>Join</button> 
