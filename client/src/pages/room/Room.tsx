@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom"; 
 import rtcpeer from "../../service/rtcpeer"; 
 import { useSocket } from "../../context/SocketProvider"; 
@@ -18,17 +18,6 @@ const Room: React.FC = ()=> {
   const { roomId } = useParams<{ roomId: string }>(); 
   const socket = useSocket(); 
 
-  
-  const sendStream = () => {
-    if (localStream && rtcpeer && rtcpeer.peer) {
-      console.log("adding stream to localstream");
-      for (const track of localStream.getTracks()) {
-        rtcpeer.peer.addTrack(track, localStream);
-      }
-    }
-  };
-
-  
   const initLocalStream = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -46,96 +35,70 @@ const Room: React.FC = ()=> {
     }
   };
 
-  const handleCall = async()=>{
-    const offer = await rtcpeer.getOffer(); 
-    socket?.emit("offer", { to:remoteSocketId, offer });
-    console.log("create offer and sending : ",offer);
-    
-  }
-
-    const handleOffer = async ({ from, offer }: OfferPayload) => {
-    console.log("got offer: ", offer);
-    const answer = await rtcpeer.getAnswer(offer); 
-    console.log("sending answer: ", answer);
-    socket?.emit("answer", { to:from, answer }); 
-    setIncommingCall(true);
-  };
-
-   const handleAnswer = async ({ answer }: AnswerPayload) => {
-    console.log("got answer: ", answer);
-    await rtcpeer.setRemote(answer); 
-    // sendStream();
-  };
-
-  
-  const handleJoinRoom = async ({ from }: JoinRoomPayload) => {
-    setRemoteSocketId(from); 
-    socket?.emit("alreadyExist", { to: from }); 
-    // await handleCall();
-  }  
-
-  
-  const handleAlreadyExist = ({ from }: AlreadyExistPayload) => {
-    console.log("remote socket id: ",from);
-    setRemoteSocketId(from); 
-  };
-
-  
-
-
-  const handleNegoOffer = async ({ from, offer }: OfferPayload) => {
-    console.log("got nego offer: ", offer);
-    const answer = await rtcpeer.getAnswer(offer); 
-    console.log("sending answer: ", answer);
-    socket?.emit("handleNegoAnswer", { to:from, answer }); 
-    
-  };
-
-  const handleNegoAnswer = async ({  answer }: AnswerPayload) => {
-    
-   console.log("got nego answer: ", answer);
-    await rtcpeer.setRemote(answer); 
-    
-    
-  };
-
-  
- 
-
-  const handleNegoNeeded = async () => {
-    console.log("additional negotiation needed here.");
-    const offer = await rtcpeer.getOffer(); 
-    console.log("nego offer: ",offer);
-    console.log("nego remote: ",roomId);
-    socket?.emit("negoOffer", { room:roomId , offer }); 
-  };
-
-  
-  const handleTrack = (event: RTCTrackEvent) => {
-    let upcomingStream = event.streams[0]; 
-    console.log("upcoming stream : ",upcomingStream);
-    
-    setRemoteStream(upcomingStream); 
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = upcomingStream; 
+  const sendStream = useCallback(() => {
+    if (localStream && rtcpeer && rtcpeer.peer) {
+      console.log("adding stream to localstream");
+      for (const track of localStream.getTracks()) {
+        rtcpeer.peer.addTrack(track, localStream);
+      }
     }
-  };
+  }, [localStream]);
 
+  const handleCall = useCallback(async () => {
+    const offer = await rtcpeer.getOffer();
+    socket?.emit("offer", { to: remoteSocketId, offer });
+    console.log("create offer and sending: ", offer);
+  }, [rtcpeer, remoteSocketId]);
+
+  const handleOffer = useCallback(async ({ from, offer }:OfferPayload) => {
+    console.log("got offer: ", offer);
+    const answer = await rtcpeer.getAnswer(offer);
+    console.log("sending answer: ", answer);
+    socket?.emit("answer", { to: from, answer });
+    setIncommingCall(true);
+  }, [rtcpeer,socket]);
+
+  const handleAnswer = useCallback(async ({ answer }:AnswerPayload) => {
+    console.log("got answer: ", answer);
+    await rtcpeer.setRemote(answer);
+    sendStream();
+  }, [rtcpeer,localStream]);
+
+  const handleJoinRoom = useCallback(({ from }:JoinRoomPayload) => {
+    setRemoteSocketId(from);
+    socket?.emit("alreadyExist", { to: from });
+  }, []);
+
+  const handleAlreadyExist = useCallback(({ from }:AlreadyExistPayload) => {
+    console.log("remote socket id: ", from);
+    setRemoteSocketId(from);
+  }, []);
+
+  const negotiationHandle = useCallback(async () => {
+    const offer = await rtcpeer.getOffer();
+    socket?.emit("offer", { offer, to: remoteSocketId });
+  }, [rtcpeer, remoteSocketId]);
+
+  const handleTrack = useCallback((event:RTCTrackEvent) => {
+    let upcomingStream = event.streams[0];
+    console.log("upcoming stream: ", upcomingStream);
+    setRemoteStream(upcomingStream);
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = upcomingStream;
+    }
+  }, []);
 
   useEffect(() => {
-
     if (!localStream) {
-      initLocalStream(); 
+      initLocalStream();
     }
-    
+
     socket?.on("join:room", handleJoinRoom);
     socket?.on("alreadyExist", handleAlreadyExist);
     socket?.on("offer", handleOffer);
-    socket?.on("negoOffer", handleNegoOffer);
-    socket?.on("negoAnswer", handleNegoAnswer);
     socket?.on("answer", handleAnswer);
-    rtcpeer.peer?.addEventListener("track", handleTrack); 
-    rtcpeer.peer?.addEventListener("negotiationneeded", handleNegoNeeded);
+    rtcpeer?.peer?.addEventListener("track", handleTrack);
+    rtcpeer?.peer?.addEventListener("negotiationneeded", negotiationHandle);
 
     return () => {
 
@@ -143,23 +106,30 @@ const Room: React.FC = ()=> {
       socket?.off("alreadyExist", handleAlreadyExist);
       socket?.off("offer", handleOffer);
       socket?.off("answer", handleAnswer);
-      rtcpeer.peer?.removeEventListener("track", handleTrack);
-      rtcpeer.peer?.removeEventListener("negotiationneeded", handleNegoNeeded);
+      rtcpeer?.peer?.removeEventListener("track", handleTrack);
+      rtcpeer?.peer?.removeEventListener("negotiationneeded", negotiationHandle);
 
     };
+  }, [
+    localStream,
+    initLocalStream,
+    handleJoinRoom,
+    handleAlreadyExist,
+    handleOffer,
+    handleAnswer,
+    handleTrack,
+    negotiationHandle
+  ])
 
-  }, []);
 
   return (
 
     <div className=" h-screen w-screen bg-slate-500   flex flex-col gap-3 justify-center items-center">
-        <button className="bg-blue-500 px-5 py-2 rounded-xl" onClick={sendStream}>
-                Accept
-              </button>
+       
        <div className=" flex justify-center items-center  w-[100%]">
          {
             incommingCall ? (
-              <button className="bg-blue-500 px-5 py-2 rounded-xl" onClick={handleCall}>
+              <button className="bg-blue-500 px-5 py-2 rounded-xl" onClick={sendStream}>
                 Accept
               </button>
             ) : localStream && remoteSocketId ? (
@@ -188,14 +158,10 @@ const Room: React.FC = ()=> {
               </div>
           </div>
        </div>
-
     </div>
     
-    
-
-    
-  );
-}
+  )
+};
 
 
 export default Room;

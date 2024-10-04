@@ -48,6 +48,9 @@ io.on("connection",(socket)=>{
     socket.on("answer", ({ to, answer }) => {
         io.to(to).emit("answer", {answer});
     });
+    socket.on("candidate", ({  candidate,room }) => {
+        socket.broadcast.to(room).emit("answer", {candidate});
+    });
 
      // Handle disconnection
     socket.on('disconnect', () => {
