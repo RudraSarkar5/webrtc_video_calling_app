@@ -52,6 +52,10 @@ io.on("connection",(socket)=>{
         socket.broadcast.to(room).emit("answer", {candidate});
     });
 
+    socket.on("end-call", ({  to }) => {
+        io.to(to).emit("end-call", {from:socket.id});
+    });
+
      // Handle disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);

@@ -57,6 +57,14 @@ class PeerService {
     }
   }
 
+  closeConnection(): void {
+    if (this.peer) {
+      this.peer.close();
+      this.peer = null;
+      console.log("Connection closed");
+    }
+  }
+
 
 }
 

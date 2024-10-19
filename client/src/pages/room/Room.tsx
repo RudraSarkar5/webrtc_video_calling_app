@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom"; 
+
+
+import { useNavigate, useParams } from "react-router-dom"; 
 import rtcpeer from "../../service/rtcpeer"; 
 import { useSocket } from "../../context/SocketProvider"; 
 import { AlreadyExistPayload,
@@ -8,6 +10,8 @@ import { AlreadyExistPayload,
          OfferPayload } from "../../Type/type"
 
 const Room: React.FC = ()=> {
+
+  const navigate = useNavigate();
  
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [incommingCall,setIncommingCall] = useState<Boolean>(false);
@@ -16,6 +20,7 @@ const Room: React.FC = ()=> {
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const [remoteSocketId, setRemoteSocketId] = useState<string | null>(null);
   const { roomId } = useParams<{ roomId: string }>(); 
+  const [connectedCall,setConnectedCall] = useState<boolean>(false);
   const socket = useSocket(); 
 
   const initLocalStream = async () => {
@@ -41,10 +46,13 @@ const Room: React.FC = ()=> {
       for (const track of localStream.getTracks()) {
         rtcpeer.peer.addTrack(track, localStream);
       }
+      setConnectedCall(true); 
     }
   }, [localStream]);
 
   const handleCall = useCallback(async () => {
+    await rtcpeer.setupConnection();
+    
     const offer = await rtcpeer.getOffer();
     socket?.emit("offer", { to: remoteSocketId, offer });
     console.log("create offer and sending: ", offer);
@@ -82,11 +90,35 @@ const Room: React.FC = ()=> {
   const handleTrack = useCallback((event:RTCTrackEvent) => {
     let upcomingStream = event.streams[0];
     console.log("upcoming stream: ", upcomingStream);
+   
     setRemoteStream(upcomingStream);
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = upcomingStream;
     }
   }, []);
+
+  const handleEndCall = () => {
+  rtcpeer.closeConnection();  
+  setConnectedCall(false);
+  setIncommingCall(false);
+  setRemoteStream(null);
+  if (remoteVideoRef.current) {
+    remoteVideoRef.current.srcObject = null;
+  }
+  socket?.emit("end-call", { to: remoteSocketId });
+  navigate("/")
+};
+
+  const handleEndCallEvent = () => {
+    // rtcpeer.closeConnection();  
+  setConnectedCall(false);
+  setIncommingCall(false);
+  setRemoteStream(null);
+  if (remoteVideoRef.current) {
+    remoteVideoRef.current.srcObject = null;
+  }
+   navigate("/");
+  };
 
   useEffect(() => {
     if (!localStream) {
@@ -97,6 +129,7 @@ const Room: React.FC = ()=> {
     socket?.on("alreadyExist", handleAlreadyExist);
     socket?.on("offer", handleOffer);
     socket?.on("answer", handleAnswer);
+    socket?.on("end-call", handleEndCallEvent);
     rtcpeer?.peer?.addEventListener("track", handleTrack);
     rtcpeer?.peer?.addEventListener("negotiationneeded", negotiationHandle);
 
@@ -106,6 +139,7 @@ const Room: React.FC = ()=> {
       socket?.off("alreadyExist", handleAlreadyExist);
       socket?.off("offer", handleOffer);
       socket?.off("answer", handleAnswer);
+      socket?.off("end-call", handleEndCallEvent);
       rtcpeer?.peer?.removeEventListener("track", handleTrack);
       rtcpeer?.peer?.removeEventListener("negotiationneeded", negotiationHandle);
 
@@ -124,41 +158,54 @@ const Room: React.FC = ()=> {
 
   return (
 
-    <div className=" h-screen w-screen bg-slate-500   flex flex-col gap-3 justify-center items-center">
-       
-       <div className=" flex justify-center items-center  w-[100%]">
-         {
-            incommingCall ? (
-              <button className="bg-blue-500 px-5 py-2 rounded-xl" onClick={sendStream}>
-                Accept
-              </button>
-            ) : localStream && remoteSocketId ? (
-              <button className="bg-blue-500 px-5 py-2 rounded-xl" onClick={handleCall}>
-                Call
-              </button>
-            ) : (
-              <h1 className="text-xl text-red-800 font-bold">
-                No user in This Room
-              </h1>
-            )
-          }
+       <div className="h-screen w-screen bg-cyan-800 flex justify-center items-center">
+      <div className="w-[80%] md:w-[60%] h-[70%] md:h-[65%]  flex flex-col justify-between">
+        <div className="flex justify-center items-center gap-4 flex-col  h-[20%]">
+         
+          {
+            !remoteSocketId ? 
+            (<h1 className="text-xl text-red-800 font-bold">
+              No user in This Room
+            </h1>)
+            :
+           connectedCall ? (
+            <button onClick={handleEndCall} className="bg-red-500 px-5 py-2 rounded-xl">
+              End Call
+            </button>
+          ) : incommingCall ? (
+            <button className="bg-blue-500 px-5 py-2 rounded-xl" onClick={sendStream}>
+              Accept
+            </button>
+          ) : (
+            <button className="bg-blue-500 px-5 py-2 rounded-xl" onClick={handleCall}>
+              Call
+            </button>
+          )
 
-       </div>
-       <div className="  h-[50%] w-screen text-white   flex flex-col md:flex-row gap-3 justify-center items-center">
-          <div className="h-[50%] w-[100%] md:h-[50%] md:w-[50%] flex flex-col items-center md:items-end justify-center">
-              <h1 className="text-center md:mr-36">My Stream</h1>
-              <div className="h-64  w-[90%]  md:w-96 bg-slate-950">
-                  <video ref={localVideoRef} className="w-[100%] object-fill h-[100%]" autoPlay />
-              </div>
+          }
+        </div>
+        <div className="h-[80%] grid  grid-rows-2 lg:grid-cols-2 lg:grid-rows-1">
+          <div className="flex flex-col h-full w-full ">
+            <div className="h-[20%] flex items-center justify-center ">
+              <h1 className="text-white">my video</h1>
+            </div>
+            <div className="h-[80%]  border-blue-500 border-2">
+              <video autoPlay className="h-full w-full object-cover" ref={localVideoRef}></video>
+            </div>
           </div>
-          <div className="  h-[50%]  w-[100%] md:w-[50%] md:h-[50%] flex flex-col items-center md:items-start justify-center">
-              <h1 className="md:ml-36 text-center">Remote Stream</h1>
-              <div className="h-64 w-[90%] md:w-96  bg-slate-950">
-                  <video ref={remoteVideoRef} className="w-[100%] object-fill h-[100%]" autoPlay />
-              </div>
+          <div className="flex flex-col h-full w-full ">
+            <div className="h-[20%] flex justify-center items-center ">
+              <h1 className="text-white">remote video</h1>
+            </div>
+            <div className="h-[80%] border-blue-500 border-2">
+              <video autoPlay className="h-full w-full object-cover" ref={remoteVideoRef}></video>
+            </div>
           </div>
-       </div>
+        </div>
+      </div>
     </div>
+
+    
     
   )
 };
